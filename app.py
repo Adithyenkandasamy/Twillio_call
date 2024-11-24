@@ -8,7 +8,10 @@ import websockets
 import asyncio
 import json
 import sys
-import time,os
+import time
+import os
+from gtts import gTTS
+
 load_dotenv()
 
 class TwilioVoiceCall:
@@ -21,9 +24,9 @@ class TwilioVoiceCall:
         
         # Audio settings
         self.CHUNK = 1024
-        self.FORMAT = pyaudio.paFloat32
+        self.FORMAT = pyaudio.paInt16
         self.CHANNELS = 1
-        self.RATE = 48000
+        self.RATE = 16000
         self.p = pyaudio.PyAudio()
         
         # Streams
@@ -51,18 +54,29 @@ class TwilioVoiceCall:
             frames_per_buffer=self.CHUNK
         )
 
-    async def handle_websocket(self, websocket_url):
+    def text_to_speech(self, text, output_file="message.wav"):
+        """Convert text to speech and save to a file"""
+        try:
+            tts = gTTS(text=text, lang='en')
+            tts.save(output_file)
+            print(f"Text-to-speech conversion complete. Saved to {output_file}")
+        except Exception as e:
+            print(f"Error converting text to speech: {e}")
+            return None
+        return output_file
+
+    async def handle_websocket(self, websocket_url, speech_file):
         """Handle WebSocket connection for real-time audio"""
         async with websockets.connect(websocket_url) as websocket:
             # Send audio thread
             async def send_audio():
-                while self.is_active:
-                    try:
-                        data = self.input_stream.read(self.CHUNK)
-                        await websocket.send(data)
-                    except Exception as e:
-                        print(f"Error sending audio: {e}")
-                        break
+                if speech_file:
+                    # Read the audio file and send its content
+                    with wave.open(speech_file, 'rb') as wf:
+                        data = wf.readframes(self.CHUNK)
+                        while data:
+                            await websocket.send(data)
+                            data = wf.readframes(self.CHUNK)
 
             # Receive audio thread
             async def receive_audio():
@@ -77,11 +91,16 @@ class TwilioVoiceCall:
             # Run both send and receive
             await asyncio.gather(send_audio(), receive_audio())
 
-    def make_call(self, to_number):
+    def make_call(self, to_number, message):
         """Initialize a two-way call"""
         try:
             self.is_active = True
             self.setup_audio()
+            
+            # Convert message to speech
+            speech_file = self.text_to_speech(message)
+            if not speech_file:
+                raise ValueError("Failed to generate speech file.")
             
             # Create TwiML for two-way audio
             response = VoiceResponse()
@@ -99,7 +118,7 @@ class TwilioVoiceCall:
             # Start WebSocket connection
             websocket_url = f'wss://your-websocket-server.com/voice/{call.sid}'
             asyncio.get_event_loop().run_until_complete(
-                self.handle_websocket(websocket_url)
+                self.handle_websocket(websocket_url, speech_file)
             )
             
             return call.sid
@@ -129,13 +148,16 @@ def main():
     voice_call = TwilioVoiceCall()
     
     try:
+        # Input the message to be spoken
+        message = input("Enter the message to speak during the call: ")
+        
         # Make call
         recipient_number = '+916382841307'  # Replace with the number you want to call
-        call_sid = voice_call.make_call(recipient_number)
+        call_sid = voice_call.make_call(recipient_number, message)
         
         if call_sid:
             print(f"Call connected! Call SID: {call_sid}")
-            print("Speaking through microphone and listening through speakers...")
+            print("Speaking the provided message...")
             print("Press Ctrl+C to end the call")
             
             # Keep the call running until user interrupts
