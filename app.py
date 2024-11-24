@@ -1,5 +1,6 @@
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse, Connect
+from dotenv import load_dotenv
 import pyaudio
 import wave
 import threading
@@ -12,9 +13,10 @@ import time
 class TwilioVoiceCall:
     def __init__(self):
         # Twilio credentials
-        self.account_sid = 'YOUR_ACCOUNT_SID'
-        self.auth_token = 'YOUR_AUTH_TOKEN'
-        self.twilio_number = 'YOUR_TWILIO_NUMBER'
+        load_dotenv()
+        self.account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+        self.auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+        self.twilio_number = os.getenv('TWILIO_NUMBER')
         self.client = Client(self.account_sid, self.auth_token)
         
         # Audio settings
