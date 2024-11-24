@@ -9,11 +9,11 @@ import asyncio
 import json
 import sys
 import time
+load_dotenv()
 
 class TwilioVoiceCall:
     def __init__(self):
         # Twilio credentials
-        load_dotenv()
         self.account_sid = os.getenv('TWILIO_ACCOUNT_SID')
         self.auth_token = os.getenv('TWILIO_AUTH_TOKEN')
         self.twilio_number = os.getenv('TWILIO_NUMBER')
